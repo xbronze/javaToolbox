@@ -41,7 +41,7 @@ public class LFUCache<K, V> {
                 return null;
             }
             cache.setHitCount(cache.getHitCount() + 1);
-            cache.setAccessTime(System.currentTimeMillis());
+            cache.setAccessTime(System.nanoTime());
             return cache.getValue();
         } else {
             return null;
@@ -52,19 +52,20 @@ public class LFUCache<K, V> {
      * 添加缓存
      * @param key
      * @param value
-     * @param expire
+     * @param expire 存活时间（秒）
      */
     public void put(K key, V value, long expire){
         checkNotNull(key);
         checkNotNull(value);
+        long nanoTime = System.nanoTime();
         // 当缓存存在时，更新缓存
         if (concurrentHashMap.containsKey(key)) {
             Cache cache = concurrentHashMap.get(key);
             // 命中次数加1
             cache.setHitCount(cache.getHitCount() + 1);
             // 更新写入时间和最后一次访问时间
-            cache.setWriteTime(System.currentTimeMillis());
-            cache.setAccessTime(System.currentTimeMillis());
+            cache.setWriteTime(nanoTime);
+            cache.setAccessTime(nanoTime);
             // 更新缓存的存活时间
             cache.setExpireTime(expire);
             // 更新缓存内容
@@ -72,7 +73,7 @@ public class LFUCache<K, V> {
             return;
         }
 
-        // 当缓存不存在，并且还没达到最大缓存数
+
         if (isFull()) {
             // 获取最少使用的缓存key
             Object leastFrequentlyUserKey = getLeastFrequentlyUsedKey();
@@ -81,11 +82,12 @@ public class LFUCache<K, V> {
             }
         }
 
+        // 当缓存不存在，并且还没达到最大缓存数
         Cache cache = new Cache();
         cache.setKey(key);
         cache.setValue(value);
-        cache.setWriteTime(System.currentTimeMillis());
-        cache.setAccessTime(System.currentTimeMillis());
+        cache.setWriteTime(nanoTime);
+        cache.setAccessTime(nanoTime);
         cache.setHitCount(1);
         cache.setExpireTime(expire);
         concurrentHashMap.put(key, cache);
@@ -119,10 +121,11 @@ public class LFUCache<K, V> {
 
 
     /**
-     * 处理过期缓存
+     * 定时清除过期缓存
      */
     class TimeoutTimerThread implements Runnable {
         public void run() {
+            // 每60秒执行一次清除过期缓存的操作
             while (true) {
                 try {
                     TimeUnit.SECONDS.sleep(60);
@@ -139,6 +142,7 @@ public class LFUCache<K, V> {
         private void expireCache() {
             for (Object key : concurrentHashMap.keySet()) {
                 Cache cache = concurrentHashMap.get(key);
+                // 纳秒 -> 秒
                 long timeoutTime = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - cache.getWriteTime());
                 if (timeoutTime > cache.getExpireTime()) {
                     // 清除过期的缓存

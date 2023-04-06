@@ -31,7 +31,7 @@ public class Cache implements Comparable<Cache>{
     private long writeTime;
 
     /**
-     * 存活时间
+     * 存活时间（秒）
      */
     private long expireTime;
 
